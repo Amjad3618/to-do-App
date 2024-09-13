@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -18,15 +20,15 @@ class _AddToDoState extends State<AddToDo> {
     var description = descriptionctrl.text;
 
     if (title.isEmpty || description.isEmpty) {
-      // You can add validation here if needed
+      // Validation for empty fields
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in both fields')),
       );
       return;
     }
 
-    // Replace the URL with your actual endpoint
-    final url = Uri.parse('https://api.nstack.in/v1/todos'); 
+    // Replace the URL with your actual API endpoint
+    final url = Uri.parse('https://api.nstack.in/v1/todos');
 
     try {
       // Send POST request
@@ -38,17 +40,21 @@ class _AddToDoState extends State<AddToDo> {
         body: json.encode({
           'title': title,
           'description': description,
-           "is_completed": false
+          "is_completed": false
         }),
       );
 
       if (response.statusCode == 201) {
-        // Success - Clear the fields and show a success message
+        // Success - Clear fields and show success message
         titlectrl.clear();
         descriptionctrl.clear();
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('To-Do added successfully!')),
         );
+
+        // Navigate back to home screen after success
+        Navigator.pop(context);
       } else {
         // Error handling
         ScaffoldMessenger.of(context).showSnackBar(
@@ -56,7 +62,7 @@ class _AddToDoState extends State<AddToDo> {
         );
       }
     } catch (error) {
-      // Handle any error during the request
+      // Handle error during the request
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('An error occurred: $error')),
       );
@@ -118,9 +124,7 @@ class _AddToDoState extends State<AddToDo> {
             ),
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {
-                submitData(); // Call submitData on button press
-              },
+              onPressed: submitData, // Call submitData on button press
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue, // Button color
                 padding: const EdgeInsets.symmetric(vertical: 15),
