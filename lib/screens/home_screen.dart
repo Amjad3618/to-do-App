@@ -1,41 +1,83 @@
-
-
-import 'package:do_to_app1/screens/add_to_do.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert'; // For encoding data to JSON format
+import 'dart:convert';
+import 'add_to_do.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
-}
+} 
 
 class _HomeScreenState extends State<HomeScreen> {
-  List items = [];
-  Future<void> fetchdata() async {
+  List _todoItems = [];
+  bool _isLoading = true;
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     const url = "https://api.nstack.in/v1/todos?page=1&limit=10";
-// ignore: unused_local_variable
-    final uri = Uri.parse(url);
-// ignore: unused_local_variable
-    final responce = await http.get(uri);
-    if (responce.statusCode == 200) {
-      final json = jsonDecode(
-        responce.body,
-      ) as Map;
-      final result = json['items'] as List;
+    try {
+      final uri = Uri.parse(url);
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonData = jsonDecode(response.body);
+        final List fetchedItems = jsonData['items'] as List;
+        setState(() {
+          _todoItems = fetchedItems;
+          _isLoading = false;
+        });
+        print("Fetched items: $_todoItems");
+      } else {
+        _showErrorSnackbar('Failed to load data');
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      _showErrorSnackbar('An error occurred: $e');
       setState(() {
-        items = result;
+        _isLoading = false;
       });
-    } else {}
+    }
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> deleteById(String id) async {
+    final url = "https://api.nstack.in/v1/todos/$id";
+    final uri = Uri.parse(url);
+
+    try {
+      final response = await http.delete(uri);
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _todoItems.removeWhere((item) => item['_id'] == id);
+        });
+        print("Item with ID $id deleted successfully");
+      } else {
+        print("Failed to delete item. Status code: ${response.statusCode}");
+        _showErrorSnackbar("Failed to delete the item");
+      }
+    } catch (e) {
+      print("An error occurred: $e");
+      _showErrorSnackbar("An error occurred while deleting the item");
+    }
   }
 
   @override
   void initState() {
-    fetchdata();
-
     super.initState();
+    _fetchData();
   }
 
   @override
@@ -43,39 +85,62 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black54,
-        title: Text("TO DO ", style: TextStyle(color: Colors.white)),
+        title: const Text("To Do", style: TextStyle(color: Colors.white)),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.orange,
         onPressed: () {
           Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const AddToDo()));
+            context,
+            MaterialPageRoute(builder: (_) => const AddToDo()),
+          ).then((_) => _fetchData()); // Refresh the list after adding a new item
         },
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-        ),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(10.0),
         child: RefreshIndicator(
-          onRefresh: fetchdata,
-          child: ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text("${index + 1}"),
-                  ),
-                  title: Text(
-                    item["title"],
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(item["description"],
-                      style: TextStyle(color: Colors.white)),
-                );
-              }),
+          onRefresh: _fetchData,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _todoItems.isEmpty
+                  ? const Center(
+                      child: Text(
+                        "No items to display",
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _todoItems.length,
+                      itemBuilder: (context, index) {
+                        final item = _todoItems[index];
+                        final itemId = item['_id']?.toString() ?? '';
+
+                        return ListTile(
+                          leading: CircleAvatar(
+                            child: Text("${index + 1}"),
+                          ),
+                          title: Text(
+                            item['title'] ?? 'No Title',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          subtitle: Text(
+                            item['description'] ?? 'No Description',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              if (itemId.isNotEmpty) {
+                                deleteById(itemId);
+                              } else {
+                                _showErrorSnackbar('Invalid item ID for deletion');
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
         ),
       ),
     );
